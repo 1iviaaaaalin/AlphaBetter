@@ -37,7 +37,7 @@
       return NGL.ColormakerRegistry.addScheme(function () {
         this.atomColor = function (atom) {
           const value = Number(atom.bfactor) || 0;
-          const eps = 0.05;
+          const eps = 0.03;
 
           // 0 永远位于黄色中心；负值向红色过渡；正值向绿色过渡。
           if (value < -eps) {
