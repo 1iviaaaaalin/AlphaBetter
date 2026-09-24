@@ -43,22 +43,22 @@
           if (value < -eps) {
             const t = Math.min(1, Math.abs(value) / scale);
             return hex(
-              mix(255, 215, t),
-              mix(255, 25, t),
-              mix(191, 28, t),
+              mix(255, 200, t),
+              mix(255, 0, t),
+              mix(255, 0, t),
             );
           }
 
           if (value > eps) {
             const t = Math.min(1, value / scale);
             return hex(
-              mix(255, 26, t),
-              mix(255, 150, t),
-              mix(191, 65, t),
+              mix(255, 0, t),
+              mix(255, 180, t),
+              mix(255, 0, t),
             );
           }
 
-          return 0xffffbf;
+          return 0xffd92f;;
         };
       });
     }
