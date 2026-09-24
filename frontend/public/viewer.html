@@ -40,25 +40,15 @@
           const eps = 0.03;
 
           // 0 永远位于黄色中心；负值向红色过渡；正值向绿色过渡。
-          if (value < -eps) {
-            const t = Math.min(1, Math.abs(value) / scale);
-            return hex(
-              mix(255, 200, t),
-              mix(255, 0, t),
-              mix(255, 0, t),
-            );
-          }
+         if (value < -eps) {
+    return 0xff3030;   // 红色
+}
 
-          if (value > eps) {
-            const t = Math.min(1, value / scale);
-            return hex(
-              mix(255, 0, t),
-              mix(255, 180, t),
-              mix(255, 0, t),
-            );
-          }
+if (value > eps) {
+    return 0x20a050;   // 绿色
+}
 
-          return 0xffd92f;;
+return 0xffd92f;       // 黄色
         };
       });
     }
