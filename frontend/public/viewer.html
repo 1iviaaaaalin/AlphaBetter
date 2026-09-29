@@ -1,85 +1,280 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AlphaBetter 3D Viewer</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <script src="https://unpkg.com/ngl@2.0.0-dev.37/dist/ngl.js"></script>
+
   <style>
-    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #ffffff; }
-    #viewer { width: 100%; height: 100%; }
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: white;
+    }
+
+    #viewer {
+      width: 100%;
+      height: 100%;
+    }
+
     #loading {
-      position: fixed; inset: 0; display: grid; place-items: center;
-      font: 14px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      color: #667085; background: #fff;
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      color: #777;
+      font-family: Arial, sans-serif;
+      font-size: 14px;
     }
   </style>
-  <script src="https://unpkg.com/ngl@2.0.0-dev.37/dist/ngl.js"></script>
 </head>
+
 <body>
-  <div id="viewer"></div>
-  <div id="loading">正在加载 3D 查看器…</div>
 
-  <script>
-    const stage = new NGL.Stage('viewer', { backgroundColor: 'white' });
-    const loading = document.getElementById('loading');
-    let currentComponent = null;
+<div id="viewer"></div>
+<div id="loading">正在加载 3D 查看器...</div>
 
-    function hex(r, g, b) {
-      return (r << 16) | (g << 8) | b;
-    }
+<script>
 
-    function mix(a, b, t) {
-      return Math.round(a + (b - a) * t);
-    }
+  // ==============================
+  // 1. 创建 NGL 查看器
+  // ==============================
 
-    if (value < -eps) {
-    return 0xff0000;   // 红色：不稳定
-}
+  var stage = new NGL.Stage("viewer", {
+    backgroundColor: "white"
+  });
 
-if (value > eps) {
-    return 0x00aa00;   // 绿色：稳定
-}
+  var currentComponent = null;
 
-return 0xffff00;       // 黄色：中性
-        };
-      });
-    }
 
-    async function loadPDB(pdbText, maxAbs) {
-      loading.style.display = 'grid';
-      try {
-        if (currentComponent) {
-          currentComponent.dispose();
-          currentComponent = null;
+  // ==============================
+  // 2. 颜色工具
+  // ==============================
+
+  function hex(r, g, b) {
+    return (r << 16) | (g << 8) | b;
+  }
+
+
+  function mix(a, b, t) {
+    return Math.round(a + (b - a) * t);
+  }
+
+
+  // ==============================
+  // 3. 根据 B-factor 进行颜色
+  // ==============================
+
+  function createScoreScheme(maxAbs) {
+
+    const scale = Math.max(Number(maxAbs) || 1, 0.0001);
+
+    return NGL.ColormakerRegistry.addScheme(function () {
+
+      this.atomColor = function (atom) {
+
+        const value = Number(atom.bfactor) || 0;
+
+        const eps = 0.03;
+
+
+        // 接近 0 → 黄色
+        if (Math.abs(value) <= eps) {
+          return 0xffff99;
         }
 
-        const blob = new Blob([pdbText], { type: 'text/plain' });
-        const file = new File([blob], 'structure.pdb', { type: 'text/plain' });
-        currentComponent = await stage.loadFile(file, { ext: 'pdb' });
 
-        const schemeId = createScoreScheme(maxAbs);
-        currentComponent.addRepresentation('cartoon', {
-          color: schemeId,
-          quality: 'medium',
-        });
-        currentComponent.autoView();
-        stage.handleResize();
-      } catch (error) {
-        console.error('NGL 加载 PDB 失败:', error);
-      } finally {
-        loading.style.display = 'none';
-      }
-    }
+        // 负值 → 红色
+        if (value < -eps) {
 
-    window.addEventListener('message', (event) => {
-      if (event.origin !== window.location.origin) return;
-      if (!event.data || event.data.type !== 'loadPDB') return;
-      loadPDB(event.data.pdbText, event.data.maxAbs);
+          const t = Math.min(
+            1,
+            Math.abs(value) / scale
+          );
+
+          return hex(
+            mix(255, 220, t),
+            mix(255, 40, t),
+            mix(255, 40, t)
+          );
+        }
+
+
+        // 正值 → 绿色
+        if (value > eps) {
+
+          const t = Math.min(
+            1,
+            value / scale
+          );
+
+          return hex(
+            mix(255, 30, t),
+            mix(255, 170, t),
+            mix(255, 70, t)
+          );
+        }
+
+
+        // 默认黄色
+        return 0xffff99;
+      };
+
     });
 
-    window.addEventListener('resize', () => stage.handleResize());
-    loading.style.display = 'none';
-    window.parent.postMessage({ type: 'viewerReady' }, window.location.origin);
-  </script>
+  }
+
+
+  // ==============================
+  // 4. 加载 PDB
+  // ==============================
+
+  async function loadPDB(pdbText, maxAbs) {
+
+    document.getElementById("loading").style.display = "block";
+
+    try {
+
+      // 如果之前已经有结构，先删除
+      if (currentComponent) {
+
+        currentComponent.dispose();
+
+        currentComponent = null;
+      }
+
+
+      // 把 PDB 文本转换成文件
+      const blob = new Blob(
+        [pdbText],
+        {
+          type: "text/plain"
+        }
+      );
+
+
+      const file = new File(
+        [blob],
+        "structure.pdb",
+        {
+          type: "text/plain"
+        }
+      );
+
+
+      // NGL 加载 PDB
+      currentComponent = await stage.loadFile(
+        file,
+        {
+          ext: "pdb"
+        }
+      );
+
+
+      // 创建颜色方案
+      const schemeId = createScoreScheme(maxAbs);
+
+
+      // 显示 cartoon
+      currentComponent.addRepresentation(
+        "cartoon",
+        {
+          color: schemeId,
+          quality: "medium"
+        }
+      );
+
+
+      // 自动调整视角
+      currentComponent.autoView();
+
+
+      // 调整尺寸
+      stage.handleResize();
+
+
+      document.getElementById("loading").style.display = "none";
+
+    } catch (error) {
+
+      console.error(
+        "NGL 加载 PDB 失败:",
+        error
+      );
+
+      document.getElementById("loading").textContent =
+        "3D 查看器加载失败，请刷新页面后重试。";
+
+    }
+
+  }
+
+
+  // ==============================
+  // 5. 接收主页面传来的 PDB
+  // ==============================
+
+  window.addEventListener(
+    "message",
+    function (event) {
+
+      // 只接受同源消息
+      if (
+        event.origin !== window.location.origin
+      ) {
+        return;
+      }
+
+
+      if (
+        !event.data ||
+        event.data.type !== "loadPDB"
+      ) {
+        return;
+      }
+
+
+      loadPDB(
+        event.data.pdbText,
+        event.data.maxAbs
+      );
+
+    }
+  );
+
+
+  // ==============================
+  // 6. 浏览器窗口变化
+  // ==============================
+
+  window.addEventListener(
+    "resize",
+    function () {
+
+      stage.handleResize();
+
+    }
+  );
+
+
+  // ==============================
+  // 7. 告诉主页面：
+  //    viewer 已经准备好了
+  // ==============================
+
+  window.parent.postMessage(
+    {
+      type: "viewerReady"
+    },
+    window.location.origin
+  );
+
+</script>
+
 </body>
 </html>
